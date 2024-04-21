@@ -1,8 +1,9 @@
 # Store Passing Trasformation in call-by-push-value
 ```agda
-module PSet9 where
+module Store-Passing where
 
 open import Data.Nat
+open import Data.Product
 
 open import Relation.Binary.PropositionalEquality as Eq using (_≡_; module ≡-Reasoning)
 ```
@@ -33,11 +34,11 @@ record CBPV : Set₂ where
     -- computation types
     F    : ValType → CompType
     unit : CompType
-    _×_  : CompType → CompType → CompType
+    _cx_  : CompType → CompType → CompType
     _⇀_  : ValType → CompType → CompType
 
-  infixr 4 _⊗_
-  infixr 4 _×_
+  infixr 5 _⊗_
+  infixr 4 _cx_
   infixr 1 _⇀_
 
   field
@@ -52,11 +53,10 @@ record CBPV : Set₂ where
     inj₁ : {A B : ValType} → val A → val (A ⊎ B)
     inj₂ : {A B : ValType} → val B → val (A ⊎ B)
 
-
     -- computation introductions
     ret : {A : ValType} → val A → comp (F A)
     triv : comp unit
-    _,_ : {X Y : CompType} → comp X → comp Y → comp (X × Y)
+    _c,_ : {X Y : CompType} → comp X → comp Y → comp (X cx Y)
     ƛ : {A : ValType} {X : CompType} → (val A → comp X) → comp (A ⇀ X)
 
     -- value eliminations
@@ -68,11 +68,12 @@ record CBPV : Set₂ where
 
     -- computation eliminations
     bind : {A : ValType} {X : CompType} → comp (F A) → (val A → comp X) → comp X
-    proj₁ : {X Y : CompType} → comp (X × Y) → comp X
-    proj₂ : {X Y : CompType} → comp (X × Y) → comp Y
+    proj₁ : {X Y : CompType} → comp (X cx Y) → comp X
+    proj₂ : {X Y : CompType} → comp (X cx Y) → comp Y
     ap : {A : ValType} {X : CompType} → comp (A ⇀ X) → val A → comp X
 
-  infixr 4 _,_
+  infixr 3 _⊗,_
+  infixr 4 _c,_
   infix 5 ƛ
   syntax ƛ (λ x → e) = ƛ x ⇒ e
 
@@ -89,9 +90,9 @@ record CBPV : Set₂ where
     F-β : {A : ValType} {X : CompType} {a : val A} {x : val A → comp X} →
       bind (ret a) x ≡ x a
     ×-β₁ : {X Y : CompType} {x : comp X} {y : comp Y} →
-      proj₁ (x , y) ≡ x
+      proj₁ (x c, y) ≡ x
     ×-β₂ : {X Y : CompType} {x : comp X} {y : comp Y} →
-      proj₂ (x , y) ≡ y
+      proj₂ (x c, y) ≡ y
     ⇀-β : {A : ValType} {X : CompType} {x : val A → comp X} {a : val A} →
       ap (ƛ x) a ≡ x a
 
@@ -106,8 +107,8 @@ record CBPV : Set₂ where
     -- computation η laws
     F-η : {A : ValType} {e : comp (F A)} →
       bind e ret ≡ e
-    ×-η : {X Y : CompType} {e : comp (X × Y)} →
-      (proj₁ e , proj₂ e) ≡ e
+    ×-η : {X Y : CompType} {e : comp (X cx Y)} →
+      (proj₁ e c, proj₂ e) ≡ e
     ⇀-η : {A : ValType} {X : CompType} {e : comp (A ⇀ X)} →
       (ƛ a ⇒ ap e a) ≡ e
     -- extra laws
@@ -149,6 +150,131 @@ record CBPV-State (𝕊 : Set) : Set₂ where
       (set[ n ]⨾ set[ n' ]⨾ x) ≡ (set[ n' ]⨾ x)
 ```
 Here, `𝕊` is a type representing the state.
+
+### Store-Passing Transformation(Safety Goal):
+```agda
+variable 𝕊 : Set
+module Compile (cbpv : CBPV) where
+  open CBPV cbpv
+
+  compile : CBPV-State 𝕊
+  CBPV.ValType (CBPV-State.cbpv compile) = CBPV.ValType cbpv
+  CBPV.CompType (CBPV-State.cbpv compile) = CBPV.CompType cbpv
+  CBPV.U (CBPV-State.cbpv compile) = U
+  CBPV.⊤ (CBPV-State.cbpv compile) = ⊤
+  CBPV._⊗_ (CBPV-State.cbpv compile) = _⊗_ 
+  CBPV.void (CBPV-State.cbpv compile) = void 
+  CBPV._⊎_ (CBPV-State.cbpv compile) = _⊎_ 
+  CBPV.F (CBPV-State.cbpv compile) = {!   !}
+  CBPV.unit (CBPV-State.cbpv compile) = unit 
+  CBPV._cx_ (CBPV-State.cbpv compile) = _cx_ 
+  CBPV._⇀_ (CBPV-State.cbpv compile) = _⇀_ 
+  CBPV.val (CBPV-State.cbpv compile) = val 
+  CBPV.comp (CBPV-State.cbpv compile) = comp 
+  CBPV.susp (CBPV-State.cbpv compile) = susp 
+  CBPV.∗ (CBPV-State.cbpv compile) = ∗ 
+  CBPV._⊗,_ (CBPV-State.cbpv compile) = _⊗,_ 
+  CBPV.inj₁ (CBPV-State.cbpv compile) = inj₁ 
+  CBPV.inj₂ (CBPV-State.cbpv compile) = inj₂ 
+  CBPV.ret (CBPV-State.cbpv compile) = ret 
+  CBPV.triv (CBPV-State.cbpv compile) = triv 
+  CBPV._c,_ (CBPV-State.cbpv compile) = _c,_ 
+  CBPV.ƛ (CBPV-State.cbpv compile) = ƛ 
+  CBPV.force (CBPV-State.cbpv compile) = force 
+  CBPV.check (CBPV-State.cbpv compile) = check 
+  CBPV.split (CBPV-State.cbpv compile) = split 
+  CBPV.absurd (CBPV-State.cbpv compile) = absurd 
+  CBPV.case (CBPV-State.cbpv compile) = case 
+  CBPV.bind (CBPV-State.cbpv compile) = bind 
+  CBPV.proj₁ (CBPV-State.cbpv compile) = {!   !}
+  CBPV.proj₂ (CBPV-State.cbpv compile) = {!   !}
+  CBPV.ap (CBPV-State.cbpv compile) = ap 
+  CBPV.U-β (CBPV-State.cbpv compile) = {!   !}
+  CBPV.⊤-β (CBPV-State.cbpv compile) = {!   !}
+  CBPV.⊗-β (CBPV-State.cbpv compile) = {!   !}
+  CBPV.F-β (CBPV-State.cbpv compile) = {!   !}
+  CBPV.×-β₁ (CBPV-State.cbpv compile) = {!   !}
+  CBPV.×-β₂ (CBPV-State.cbpv compile) = {!   !}
+  CBPV.⇀-β (CBPV-State.cbpv compile) = {!   !}
+  CBPV.U-η (CBPV-State.cbpv compile) = {!   !}
+  CBPV.⊤-η (CBPV-State.cbpv compile) = {!   !}
+  CBPV.⊗-η (CBPV-State.cbpv compile) = {!   !}
+  CBPV.F-η (CBPV-State.cbpv compile) = {!   !}
+  CBPV.×-η (CBPV-State.cbpv compile) = {!   !}
+  CBPV.⇀-η (CBPV-State.cbpv compile) = {!   !}
+  CBPV.bind-assoc (CBPV-State.cbpv compile) = {!   !}
+  CBPV-State.set[_]⨾_ compile = {!   !}
+  CBPV-State.get⨾ compile = {!   !}
+  CBPV-State.F-set compile = {!   !}
+  CBPV-State.F-get compile = {!   !}
+  CBPV-State.get-get compile = {!   !}
+  CBPV-State.get-set compile = {!   !}
+  CBPV-State.set-get compile = {!   !}
+  CBPV-State.set-set compile = {!   !}
+```
+```human
+  ValType  : Set₁
+  CompType : Set₁
+
+  U    : CompType → ValType
+  ⊤    : ValType
+  _⊗_  : ValType → ValType → ValType
+  void : ValType
+  _⊎_  : ValType → ValType → ValType
+
+  -- computation types
+  F    : ValType → CompType
+  unit : CompType
+  _cx_  : CompType → CompType → CompType
+  _⇀_  : ValType → CompType → CompType
+
+    susp : {X : CompType} → comp X → val (U X)
+    ∗    : val ⊤
+    _⊗,_ : {A B : ValType} → val A → val B → val (A ⊗ B)
+    inj₁ : {A B : ValType} → val A → val (A ⊎ B)
+    inj₂ : {A B : ValType} → val B → val (A ⊎ B)
+
+    ret : {A : ValType} → val A → comp (F A)
+    triv : comp unit
+    _c,_ : {X Y : CompType} → comp X → comp Y → comp (X cx Y)
+    ƛ : {A : ValType} {X : CompType} → (val A → comp X) → comp (A ⇀ X)
+
+    force : {X : CompType} → val (U X) → comp X
+    check : {X : CompType} → val ⊤ → comp X → comp X
+    split : {A B : ValType} {X : CompType} → val (A ⊗ B) → (val A → val B → comp X) → comp X
+    absurd : {X : CompType} → val void → comp X
+    case : {A B : ValType} {X : CompType} → val (A ⊎ B) → (val A → comp X) → (val B → comp X) → comp X
+
+    bind : {A : ValType} {X : CompType} → comp (F A) → (val A → comp X) → comp X
+    proj₁ : {X Y : CompType} → comp (X cx Y) → comp X
+    proj₂ : {X Y : CompType} → comp (X cx Y) → comp Y
+    ap : {A : ValType} {X : CompType} → comp (A ⇀ X) → val A → comp X
+
+  CBPV-State.{! !} compile = ?
+```
+
+### Isomorphism between the two forms (Target Goal):
+Currently work in progress. I have some weird error where it thinks these shuld be of type CBPV.
+
+But I think that CBPV is a module not a type, so I am confused.
+```human
+record _↔_ (𝔸 𝔹 : Set) : Set where
+  field
+    to : 𝔸 → 𝔹
+    from : 𝔹 → 𝔸
+    to-from : (𝕒 : 𝔸) → from (to 𝕒) ≡ 𝕒
+    from-to : (𝕓 : 𝔹) → to (from 𝕓) ≡ 𝕓
+
+variable 𝕊 : Set
+module Transformation (cbpvs : CBPV-State 𝕊) where
+  open CBPV-State cbpvs
+
+  store-passing : ((CBPV.comp (CBPV.F CBPV.⊤) × 𝕊) ↔ comp (F ⊤))
+  _↔_.to store-passing f ={! !} 
+  _↔_.from store-passing x = {!   !}
+  _↔_.to-from store-passing f = {!   !}
+  _↔_.from-to store-passing f = {!   !}
+```
 
 ### Test Cases Straight from PSet9:
 This should all be still working with no unfinished goals just to make sure that our new definitions haven't broken any obvious proofs.
@@ -234,7 +360,7 @@ Similarly, we may implement a function to compute the `n`th Fibonacci number.
 
 Implement an imperative (i.e., stateful) algorithm `fib` to compute the `n`th Fibonacci number, and prove that it matches the specification.
 ```agda
-module Fibonacci (cbpv : CBPV-State (ℕ CBPV-State.× ℕ)) where
+module Fibonacci (cbpv : CBPV-State (ℕ × ℕ)) where
   open CBPV-State cbpv
 
   fib : ℕ → comp (F ⊤)
@@ -367,3 +493,4 @@ Prove this theorem (by induction on `effs`, the sequence of effects).
     ∎
     )
 ```
+   
