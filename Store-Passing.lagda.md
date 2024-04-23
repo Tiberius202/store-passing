@@ -159,34 +159,46 @@ module Compile (cbpv : CBPV) (𝕊 : CBPV.ValType cbpv) where
   compile : CBPV-State (val 𝕊)
   compile = record {
       cbpv = record cbpv {
-        -- comp = λ ctype → (comp ctype) × val 𝕊;
         -- Alternate definition that only transforms into a comp once. Sticks to the language
-        comp = λ ctype → comp ( 𝕊 ⇀ (ctype cx (F 𝕊)));
-        susp = {!   !};
+        -- comp = λ ctype → comp ( 𝕊 ⇀ (ctype cx (F 𝕊)));
+        comp = {!   !};
+        F = λ v → {!   !};
+        U = λ x → U (𝕊 ⇀ x cx (F 𝕊) );
+        susp = susp;
         ret = λ x → ƛ s ⇒ (ret x c, ret s);
         triv = ƛ s ⇒ (triv c, ret s);
         _c,_ = λ l r → ƛ s ⇒ 
           bind (CBPV.proj₂ cbpv (ap l s)) λ s →
           bind (CBPV.proj₂ cbpv (ap r s)) λ s →
           (CBPV.proj₁ cbpv (ap l s) c, CBPV.proj₁ cbpv (ap r s)) c, ret s;
-        ƛ = λ f → (ƛ s ⇒ (ƛ a ⇒ (CBPV.proj₁ cbpv (ap (f a) s) c, ret {! CBPV.proj₂ cbpv (ap (f a) s)  !}) ));
-        force = {!   !};
-        check = {!   !};
-        split = {!   !} ;
-        absurd = {!   !};
+        ƛ = λ f → ƛ s ⇒ (
+          -- bind {! CBPV.proj₂ cbpv (ap (f a) s) !} λ s → The function cannot change the state only the first bit
+          ƛ a ⇒ (CBPV.proj₁ cbpv (ap (f a) s)) c, ret s
+          );
+        force = force;
+        check = check;
+        split = split;
+        absurd = λ v → ƛ s ⇒ (absurd v c, ret s);
         case = {!   !};
-        bind = {!   !};
-        proj₁ = {!   !};
-        proj₂ = {!   !};
+        bind = λ cA fAaX → ƛ s ⇒ 
+          bind (CBPV.proj₂ cbpv (ap cA s)) λ s → {!   !}
+          -- bind (CBPV.proj₂ cbpv (ap (fAaX {!   !}) s)) λ s →
+          -- bind (CBPV.proj₁ cbpv (ap cA s)) {! fAaX  !} c, ret s
+          ;
+        proj₁ = λ f → ƛ s ⇒ (CBPV.proj₁ cbpv (CBPV.proj₁ cbpv (ap f s)) c, (CBPV.proj₂ cbpv (ap f s)));
+        proj₂ = λ f → ƛ s ⇒ (CBPV.proj₂ cbpv (CBPV.proj₁ cbpv (ap f s)) c, (CBPV.proj₂ cbpv (ap f s)));
         ap = {!   !};
         -- F = λ v → 𝕊 ⇀ F (v ⊗ 𝕊);
         -- ret = λ x → ƛ z ⇒ ret (x ⊗, z);
         -- bind = λ f s → bind ( ap f {!   !} ) λ p → {! s y  !};
         -- bind-assoc = {!   !};
         F-η = {!   !};
+        F-β = {!   !};
         ×-η = {!   !};
+        ×-β₁ = {!   !};
+        ×-β₂ = {!   !};
         ⇀-η = {!   !};
-        -- F-β = {!   !};
+        bind-assoc = {!   !};
         CompType = CompType;
         ValType = ValType --Just explicitly showing that this is unchanged
       }
