@@ -153,104 +153,44 @@ Here, `𝕊` is a type representing the state.
 
 ### Store-Passing Transformation(Safety Goal):
 ```agda
-variable 𝕊 : Set
-module Compile (cbpv : CBPV) where
+module Compile (cbpv : CBPV) (𝕊 : CBPV.ValType cbpv) where
   open CBPV cbpv
 
-  compile : CBPV-State 𝕊
-  CBPV.ValType (CBPV-State.cbpv compile) = CBPV.ValType cbpv
-  CBPV.CompType (CBPV-State.cbpv compile) = CBPV.CompType cbpv
-  CBPV.U (CBPV-State.cbpv compile) = U
-  CBPV.⊤ (CBPV-State.cbpv compile) = ⊤
-  CBPV._⊗_ (CBPV-State.cbpv compile) = _⊗_ 
-  CBPV.void (CBPV-State.cbpv compile) = void 
-  CBPV._⊎_ (CBPV-State.cbpv compile) = _⊎_ 
-  CBPV.F (CBPV-State.cbpv compile) = {!   !}
-  CBPV.unit (CBPV-State.cbpv compile) = unit 
-  CBPV._cx_ (CBPV-State.cbpv compile) = _cx_ 
-  CBPV._⇀_ (CBPV-State.cbpv compile) = _⇀_ 
-  CBPV.val (CBPV-State.cbpv compile) = val 
-  CBPV.comp (CBPV-State.cbpv compile) = comp 
-  CBPV.susp (CBPV-State.cbpv compile) = susp 
-  CBPV.∗ (CBPV-State.cbpv compile) = ∗ 
-  CBPV._⊗,_ (CBPV-State.cbpv compile) = _⊗,_ 
-  CBPV.inj₁ (CBPV-State.cbpv compile) = inj₁ 
-  CBPV.inj₂ (CBPV-State.cbpv compile) = inj₂ 
-  CBPV.ret (CBPV-State.cbpv compile) = ret 
-  CBPV.triv (CBPV-State.cbpv compile) = triv 
-  CBPV._c,_ (CBPV-State.cbpv compile) = _c,_ 
-  CBPV.ƛ (CBPV-State.cbpv compile) = ƛ 
-  CBPV.force (CBPV-State.cbpv compile) = force 
-  CBPV.check (CBPV-State.cbpv compile) = check 
-  CBPV.split (CBPV-State.cbpv compile) = split 
-  CBPV.absurd (CBPV-State.cbpv compile) = absurd 
-  CBPV.case (CBPV-State.cbpv compile) = case 
-  CBPV.bind (CBPV-State.cbpv compile) = bind 
-  CBPV.proj₁ (CBPV-State.cbpv compile) = {!   !}
-  CBPV.proj₂ (CBPV-State.cbpv compile) = {!   !}
-  CBPV.ap (CBPV-State.cbpv compile) = ap 
-  CBPV.U-β (CBPV-State.cbpv compile) = {!   !}
-  CBPV.⊤-β (CBPV-State.cbpv compile) = {!   !}
-  CBPV.⊗-β (CBPV-State.cbpv compile) = {!   !}
-  CBPV.F-β (CBPV-State.cbpv compile) = {!   !}
-  CBPV.×-β₁ (CBPV-State.cbpv compile) = {!   !}
-  CBPV.×-β₂ (CBPV-State.cbpv compile) = {!   !}
-  CBPV.⇀-β (CBPV-State.cbpv compile) = {!   !}
-  CBPV.U-η (CBPV-State.cbpv compile) = {!   !}
-  CBPV.⊤-η (CBPV-State.cbpv compile) = {!   !}
-  CBPV.⊗-η (CBPV-State.cbpv compile) = {!   !}
-  CBPV.F-η (CBPV-State.cbpv compile) = {!   !}
-  CBPV.×-η (CBPV-State.cbpv compile) = {!   !}
-  CBPV.⇀-η (CBPV-State.cbpv compile) = {!   !}
-  CBPV.bind-assoc (CBPV-State.cbpv compile) = {!   !}
-  CBPV-State.set[_]⨾_ compile = {!   !}
-  CBPV-State.get⨾ compile = {!   !}
-  CBPV-State.F-set compile = {!   !}
-  CBPV-State.F-get compile = {!   !}
-  CBPV-State.get-get compile = {!   !}
-  CBPV-State.get-set compile = {!   !}
-  CBPV-State.set-get compile = {!   !}
-  CBPV-State.set-set compile = {!   !}
-```
-```human
-  ValType  : Set₁
-  CompType : Set₁
-
-  U    : CompType → ValType
-  ⊤    : ValType
-  _⊗_  : ValType → ValType → ValType
-  void : ValType
-  _⊎_  : ValType → ValType → ValType
-
-  -- computation types
-  F    : ValType → CompType
-  unit : CompType
-  _cx_  : CompType → CompType → CompType
-  _⇀_  : ValType → CompType → CompType
-
-    susp : {X : CompType} → comp X → val (U X)
-    ∗    : val ⊤
-    _⊗,_ : {A B : ValType} → val A → val B → val (A ⊗ B)
-    inj₁ : {A B : ValType} → val A → val (A ⊎ B)
-    inj₂ : {A B : ValType} → val B → val (A ⊎ B)
-
-    ret : {A : ValType} → val A → comp (F A)
-    triv : comp unit
-    _c,_ : {X Y : CompType} → comp X → comp Y → comp (X cx Y)
-    ƛ : {A : ValType} {X : CompType} → (val A → comp X) → comp (A ⇀ X)
-
-    force : {X : CompType} → val (U X) → comp X
-    check : {X : CompType} → val ⊤ → comp X → comp X
-    split : {A B : ValType} {X : CompType} → val (A ⊗ B) → (val A → val B → comp X) → comp X
-    absurd : {X : CompType} → val void → comp X
-    case : {A B : ValType} {X : CompType} → val (A ⊎ B) → (val A → comp X) → (val B → comp X) → comp X
-
-    bind : {A : ValType} {X : CompType} → comp (F A) → (val A → comp X) → comp X
-    proj₁ : {X Y : CompType} → comp (X cx Y) → comp X
-    proj₂ : {X Y : CompType} → comp (X cx Y) → comp Y
-    ap : {A : ValType} {X : CompType} → comp (A ⇀ X) → val A → comp X
-
-  CBPV-State.{! !} compile = ?
+  compile : CBPV-State (val 𝕊)
+  compile = record {
+      cbpv = record cbpv {
+        -- comp = λ ctype → (comp ctype) × val 𝕊;
+        -- Alternate definition that only transforms into a comp once. Sticks to the language
+        comp = λ ctype → comp ( 𝕊 ⇀ (ctype cx (F 𝕊)));
+        susp = {!   !};
+        ret = λ x → ƛ s ⇒ (ret x c, ret s);
+        triv = ƛ s ⇒ (triv c, ret s);
+        _c,_ = λ l r → ƛ s ⇒ 
+          bind (CBPV.proj₂ cbpv (ap l s)) λ s →
+          bind (CBPV.proj₂ cbpv (ap r s)) λ s →
+          (CBPV.proj₁ cbpv (ap l s) c, CBPV.proj₁ cbpv (ap r s)) c, ret s;
+        ƛ = λ f → (ƛ s ⇒ (ƛ a ⇒ (CBPV.proj₁ cbpv (ap (f a) s) c, ret {! CBPV.proj₂ cbpv (ap (f a) s)  !}) ));
+        force = {!   !};
+        check = {!   !};
+        split = {!   !} ;
+        absurd = {!   !};
+        case = {!   !};
+        bind = {!   !};
+        proj₁ = {!   !};
+        proj₂ = {!   !};
+        ap = {!   !};
+        -- F = λ v → 𝕊 ⇀ F (v ⊗ 𝕊);
+        -- ret = λ x → ƛ z ⇒ ret (x ⊗, z);
+        -- bind = λ f s → bind ( ap f {!   !} ) λ p → {! s y  !};
+        -- bind-assoc = {!   !};
+        F-η = {!   !};
+        ×-η = {!   !};
+        ⇀-η = {!   !};
+        -- F-β = {!   !};
+        CompType = CompType;
+        ValType = ValType --Just explicitly showing that this is unchanged
+      }
+    }
 ```
 
 ### Isomorphism between the two forms (Target Goal):
@@ -493,4 +433,4 @@ Prove this theorem (by induction on `effs`, the sequence of effects).
     ∎
     )
 ```
-   
+     
