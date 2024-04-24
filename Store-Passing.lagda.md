@@ -114,7 +114,10 @@ record CBPV : Set₂ where
     -- extra laws
     bind-assoc : {A B : ValType} {X : CompType} {fa : comp (F A)} {fb : val A → comp (F B)} {x : val B → comp X} →
       bind (bind fa fb) x ≡ bind fa λ a → bind (fb a) x
-
+    bind-split : {A B C : ValType} {X : CompType} {ab : val (A ⊗ B)} {c : val A → val B → comp (F C)} {x : val C → comp X} →
+      bind (split ab c) x ≡ split ab λ a b → bind (c a b) x
+    -- bind-ap : {A B : ValType} {X : CompType} {c : val A} {f : val A → comp (F B)} {x : val B → comp X} →
+      -- bind (ap f c) x ≡ ap (λ c → bind f x) c
   variable
     A B C : ValType
     X Y Z : CompType
@@ -158,50 +161,214 @@ module Compile (cbpv : CBPV) (𝕊 : CBPV.ValType cbpv) where
 
   compile : CBPV-State (val 𝕊)
   compile = record {
-      cbpv = record cbpv {
-        -- Alternate definition that only transforms into a comp once. Sticks to the language
-        -- comp = λ ctype → comp ( 𝕊 ⇀ (ctype cx (F 𝕊)));
-        comp = {!   !};
-        F = λ v → {!   !};
-        U = λ x → U (𝕊 ⇀ x cx (F 𝕊) );
-        susp = susp;
-        ret = λ x → ƛ s ⇒ (ret x c, ret s);
-        triv = ƛ s ⇒ (triv c, ret s);
-        _c,_ = λ l r → ƛ s ⇒ 
-          bind (CBPV.proj₂ cbpv (ap l s)) λ s →
-          bind (CBPV.proj₂ cbpv (ap r s)) λ s →
-          (CBPV.proj₁ cbpv (ap l s) c, CBPV.proj₁ cbpv (ap r s)) c, ret s;
-        ƛ = λ f → ƛ s ⇒ (
-          -- bind {! CBPV.proj₂ cbpv (ap (f a) s) !} λ s → The function cannot change the state only the first bit
-          ƛ a ⇒ (CBPV.proj₁ cbpv (ap (f a) s)) c, ret s
-          );
-        force = force;
-        check = check;
-        split = split;
-        absurd = λ v → ƛ s ⇒ (absurd v c, ret s);
-        case = {!   !};
-        bind = λ cA fAaX → ƛ s ⇒ 
-          bind (CBPV.proj₂ cbpv (ap cA s)) λ s → {!   !}
-          -- bind (CBPV.proj₂ cbpv (ap (fAaX {!   !}) s)) λ s →
-          -- bind (CBPV.proj₁ cbpv (ap cA s)) {! fAaX  !} c, ret s
-          ;
-        proj₁ = λ f → ƛ s ⇒ (CBPV.proj₁ cbpv (CBPV.proj₁ cbpv (ap f s)) c, (CBPV.proj₂ cbpv (ap f s)));
-        proj₂ = λ f → ƛ s ⇒ (CBPV.proj₂ cbpv (CBPV.proj₁ cbpv (ap f s)) c, (CBPV.proj₂ cbpv (ap f s)));
-        ap = {!   !};
-        -- F = λ v → 𝕊 ⇀ F (v ⊗ 𝕊);
-        -- ret = λ x → ƛ z ⇒ ret (x ⊗, z);
-        -- bind = λ f s → bind ( ap f {!   !} ) λ p → {! s y  !};
-        -- bind-assoc = {!   !};
-        F-η = {!   !};
-        F-β = {!   !};
-        ×-η = {!   !};
-        ×-β₁ = {!   !};
-        ×-β₂ = {!   !};
-        ⇀-η = {!   !};
-        bind-assoc = {!   !};
-        CompType = CompType;
-        ValType = ValType --Just explicitly showing that this is unchanged
-      }
+    cbpv = record cbpv {
+      comp = λ ctype → comp (𝕊 ⇀ ctype);
+      F = λ x → F (x ⊗ 𝕊);
+      U = λ x → U (𝕊 ⇀ x);
+      ret = λ x → ƛ s ⇒ ret (x ⊗, s);
+      triv = ƛ _ ⇒ triv;
+      _c,_ = λ l r → ƛ s ⇒ (ap l s c, ap r s);
+      ƛ = λ f → ƛ s ⇒ ƛ a ⇒ ap (f a) s;
+      bind = λ cA fASX → ƛ s ⇒ bind (ap cA s) λ aoxs → split aoxs λ a → ap (fASX a);
+      proj₁ = λ xandy → ƛ s ⇒ CBPV.proj₁ cbpv (ap xandy s);
+      proj₂ = λ xandy → ƛ s ⇒ CBPV.proj₂ cbpv (ap xandy s);
+      ap = λ f v → ƛ s ⇒ ap (ap f s) v;
+      F-η = λ {_} {e} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ bind (ap e z) (λ z₁ → split z₁ (λ z₂ → ap (ƛ z₃ ⇒ ret (z₂ ⊗, z₃))))
+        ≡⟨ Eq.cong ƛ (funext λ z →
+          Eq.cong (λ x → bind (ap e z) x) (funext (λ z₁ → 
+            Eq.cong (λ x → split z₁ x) (funext (λ _ → funext (λ _ → ⇀-β))))
+          )) ⟩
+          ƛ z ⇒ bind (ap e z) (λ z₁ → split z₁ (λ z₂ z₃ → ret (z₂ ⊗, z₃)))
+        ≡⟨ Eq.cong ƛ (funext λ z →
+          Eq.cong (λ x → bind (ap e z) x) (funext (λ _ → 
+            ⊗-η
+          ))) ⟩
+          ƛ z ⇒ bind (ap e z) ret
+        ≡⟨ Eq.cong ƛ (funext (λ _ → F-η)) ⟩
+          ƛ z ⇒ ap e z
+        ≡⟨ ⇀-η ⟩
+          e
+        ∎;
+      F-β = λ {_} {_} {a} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ bind ((ap (ƛ z₁ ⇒ ret (a ⊗, z₁))) z) (λ z₁ → split z₁ λ z₂ → ap (x z₂))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ y → bind y (λ z₁ → split z₁ λ z₂ → ap (x z₂))) ⇀-β) ⟩
+          ƛ z ⇒ bind (ret (a ⊗, z)) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ z → F-β) ⟩
+          ƛ z ⇒ split (a ⊗, z) (λ z₂ → ap (x z₂))
+        ≡⟨ Eq.cong ƛ (funext λ z → ⊗-β) ⟩
+          ƛ z ⇒ (λ z₂ → ap (x z₂)) a z
+        ≡⟨ Eq.cong ƛ Eq.refl ⟩
+          ƛ ((λ z₂ → ap (x z₂)) a)
+        ≡⟨⟩
+          ƛ (ap (x a))
+        ≡⟨ ⇀-η ⟩
+          x a
+        ∎;
+      ×-η = λ {_ _} {e} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ ((ap (ƛ z₁ ⇒ CBPV.proj₁ cbpv (ap e z₁)) z) c, (ap (ƛ z₁ ⇒ CBPV.proj₂ cbpv (ap e z₁)) z))
+        ≡⟨ Eq.cong ƛ Eq.refl ⟩
+          ƛ z ⇒ ((ap (ƛ z₁ ⇒ CBPV.proj₁ cbpv (ap e z₁)) z) c, (ap (ƛ z₁ ⇒ CBPV.proj₂ cbpv (ap e z₁)) z))
+        ≡⟨ Eq.cong ƛ (funext (λ z → Eq.cong (λ x → x c, (ap (ƛ z₁ ⇒ CBPV.proj₂ cbpv (ap e z₁)) z)) ⇀-β)) ⟩
+          ƛ z ⇒ ((CBPV.proj₁ cbpv (ap e z)) c, (ap (ƛ z₁ ⇒ CBPV.proj₂ cbpv (ap e z₁)) z))
+        ≡⟨ Eq.cong ƛ (funext (λ z → Eq.cong (λ x → (CBPV.proj₁ cbpv (ap e z)) c, x) ⇀-β)) ⟩
+          ƛ z ⇒ ((CBPV.proj₁ cbpv (ap e z)) c, (CBPV.proj₂ cbpv (ap e z)))
+        ≡⟨ Eq.cong ƛ (funext (λ z → ×-η)) ⟩
+          ƛ z ⇒ (ap e z)
+        ≡⟨ ⇀-η ⟩
+          e
+        ∎;
+      ×-β₁ = λ {_ _} {x} {y} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ CBPV.proj₁ cbpv (ap (ƛ z₁ ⇒ (ap x z₁ c, ap y z₁)) z)
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → CBPV.proj₁ cbpv x₁) ⇀-β) ⟩
+          ƛ z ⇒ CBPV.proj₁ cbpv (ap x z c, ap y z)
+        ≡⟨ Eq.cong ƛ (funext λ z → ×-β₁) ⟩
+          ƛ z ⇒ ap x z
+        ≡⟨ ⇀-η ⟩
+          x
+        ∎;
+      ×-β₂ = λ {_ _} {x} {y} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ CBPV.proj₂ cbpv (ap (ƛ z₁ ⇒ (ap x z₁ c, ap y z₁)) z)
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → CBPV.proj₂ cbpv x₁) ⇀-β) ⟩
+          ƛ z ⇒ CBPV.proj₂ cbpv (ap x z c, ap y z)
+        ≡⟨ Eq.cong ƛ (funext λ z → ×-β₂) ⟩
+          ƛ z ⇒ ap y z
+        ≡⟨ ⇀-η ⟩
+          y
+        ∎;
+      ⇀-β = λ {_} {_} {x} {a} →
+        let open ≡-Reasoning in
+        begin
+          ƛ (λ z → ap (ap (ƛ (λ z₁ → ƛ (λ z₂ → ap (x z₂) z₁))) z) a)
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → ap x₁ a) ⇀-β) ⟩
+          ƛ (λ z → ap (ƛ (λ z₂ → ap (x z₂) z)) a)
+        ≡⟨ Eq.cong ƛ (funext λ z → ⇀-β) ⟩
+          ƛ (λ z → ap (x a) z)
+        ≡⟨ ⇀-η ⟩
+          x a
+        ∎;
+      ⇀-η = λ {_} {_} {e} →
+        let open ≡-Reasoning in
+        begin
+          ƛ (λ z → ƛ (λ z₁ → ap (ƛ (λ z₂ → ap (ap e z₂) z₁)) z))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong ƛ (funext λ z₁ → ⇀-β)) ⟩
+          ƛ (λ z → ƛ (λ z₁ → ap (ap e z) z₁))
+        ≡⟨ Eq.cong ƛ (funext λ z → ⇀-η) ⟩
+          ƛ (λ z → ap e z )
+        ≡⟨ ⇀-η ⟩
+          e
+        ∎;
+      bind-split = λ {_ _ _} {_} {ab} {c} {x} →
+        let cfl : (ab : val (A ⊗ B)) → (Σ[ (a , b) ∈ (val A × val B) ] (ab ≡ (a ⊗, b)))
+            cfl = {!   !}
+            ((a , b) , pf) = cfl ab
+        in
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ bind (ap (split ab c) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → bind (ap (split x₁ c) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))) pf) ⟩
+          ƛ z ⇒ bind (ap (split (a ⊗, b) c) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → bind (ap x₁ z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))) ⊗-β) ⟩
+          ƛ z ⇒ bind (ap (c a b) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.sym ⊗-β ⟩
+          split (a ⊗, b) (λ z z₁ → (ƛ z₂ ⇒ bind (ap (c z z₁) z₂) (λ z₃ → split z₃ (λ z₄ → ap (x z₄)))))
+        ≡⟨ Eq.cong (λ x₁ → split x₁ λ z z₁ → (ƛ z₂ ⇒ bind (ap (c z z₁) z₂) (λ z₃ → split z₃ (λ z₄ → ap (x z₄))))) (Eq.sym pf) ⟩
+          split ab (λ z z₁ → (ƛ z₂ ⇒ bind (ap (c z z₁) z₂) (λ z₃ → split z₃ (λ z₄ → ap (x z₄)))))
+        ∎;
+      bind-assoc = λ {_ _} {_} {fa} {fb} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ bind (ap (ƛ (λ z₁ → bind (ap fa z₁) (λ z₂ → split z₂ (λ z₃ → ap (fb z₃))))) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → bind x₁ λ z₁ → split z₁ λ z₂ → ap (x z₂)) ⇀-β)  ⟩
+          ƛ z ⇒ bind (bind (ap fa z) (λ z₂ → split z₂ (λ z₃ → ap (fb z₃)))) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ z → bind-assoc) ⟩
+          ƛ z ⇒ (bind (ap fa z) λ a → bind (split a (λ z₃ → ap (fb z₃))) (λ z₁ → split z₁ (λ z₂ → ap (x z₂))))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → bind (ap fa z) x₁) (funext λ a → bind-split)) ⟩
+          ƛ z ⇒ bind (ap fa z) (λ z₁ → split z₁ (λ z₂ → (λ y → bind (ap (fb z₂) y) (λ z₄ → split z₄ (λ z₅ → ap (x z₅))))))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → bind (ap fa z) x₁) (funext λ z₁ → Eq.cong (λ x₁ → split z₁ x₁) (funext λ z₂ → funext λ y → Eq.sym ⇀-β))) ⟩
+          ƛ z ⇒ bind (ap fa z) (λ z₁ → split z₁ (λ z₂ → (λ y → ap (ƛ (λ z₃ → bind (ap (fb z₂) z₃) (λ z₄ → split z₄ (λ z₅ → ap (x z₅))))) y)))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → bind (ap fa z) x₁) (funext λ a → Eq.refl)) ⟩
+          ƛ z ⇒ bind (ap fa z) (λ z₁ → split z₁ (λ z₂ → ap (ƛ (λ z₃ → bind (ap (fb z₂) z₃) (λ z₄ → split z₄ (λ z₅ → ap (x z₅)))))))
+        ∎;
+      CompType = CompType; --Just explicitly showing that these are unchanged
+      ValType = ValType
+    };
+      -- set[_]⨾_ : {X : CompType} → 𝕊 → comp X → comp X = ?;
+    set[_]⨾_ = λ x lvalue → ƛ _ ⇒ ap lvalue x;
+      -- get⨾_ : {X : CompType} → (𝕊 → comp X) → comp X
+    get⨾_ = λ user → ƛ s ⇒ ap (user s) s;
+
+      -- F-set : {n : 𝕊} {A : ValType} {X : CompType} {e : comp (F A)} {x : val A → comp X} →
+      --   bind (set[ n ]⨾ e) x ≡ set[ n ]⨾ bind e x
+    F-set = λ {n} {_} {_} {e} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ bind (ap (ƛ _ ⇒ ap e n) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ _ → Eq.cong (λ x₁ → bind x₁ (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))) ⇀-β) ⟩
+          ƛ _ ⇒ bind (ap e n) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ _ → Eq.sym ⇀-β) ⟩
+          ƛ _ ⇒ (ap (ƛ z ⇒ bind (ap e z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))) n)
+        ∎;
+      -- F-get : {n : 𝕊} {A : ValType} {X : CompType} {e : 𝕊 → comp (F A)} {x : val A → comp X} →
+      --   bind (get⨾ e) x ≡ get⨾ λ n → bind (e n) x
+    F-get = λ {n} {_} {_} {e} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ z ⇒ bind (ap (ƛ z₁ ⇒ ap (e z₁) z₁) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.cong (λ x₁ → bind x₁ (λ z₁ → split z₁ (λ z₂ → ap (x z₂))) ) ⇀-β ) ⟩
+          ƛ z ⇒ bind (ap (e z) z) (λ z₁ → split z₁ (λ z₂ → ap (x z₂)))
+        ≡⟨ Eq.cong ƛ (funext λ z → Eq.sym ⇀-β) ⟩
+          ƛ z ⇒ (ap (ƛ z₁ ⇒ bind (ap (e z) z₁) (λ z₂ → split z₂ (λ z₃ → ap (x z₃)))) z)
+        ∎;
+
+      -- get-get : {X : CompType} {x : 𝕊 → 𝕊 → comp X} →
+      --   (get⨾ λ n₁ → get⨾ λ n₂ → x n₁ n₂) ≡ (get⨾ λ n → x n n)
+    get-get = λ {_} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ (λ z → ap (ƛ (λ z₁ → ap (x z z₁) z₁)) z)
+        ≡⟨ Eq.cong ƛ (funext λ z → ⇀-β) ⟩
+          ƛ (λ z → ap (x z z) z)
+        ∎;
+      -- get-set : {X : CompType} {x : comp X} →
+      --   (get⨾ λ n → set[ n ]⨾ x) ≡ x
+    get-set = λ {_} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ (λ z → ap (ƛ (λ _ → ap x z)) z)
+        ≡⟨ Eq.cong ƛ (funext λ z → ⇀-β) ⟩
+          ƛ (λ z → ap x z)
+        ≡⟨ ⇀-η ⟩
+          x
+        ∎;
+      -- set-get : {X : CompType} {n : 𝕊} {x : 𝕊 → comp X} →
+      --   (set[ n ]⨾ get⨾ x) ≡ (set[ n ]⨾ x n)
+    set-get = λ {_} {n} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ (λ _ → ap (ƛ (λ z → ap (x z) z)) n)
+        ≡⟨ Eq.cong ƛ (funext λ _ → ⇀-β) ⟩
+          ƛ (λ _ → ap (x n) n)
+        ∎;
+      -- set-set : {X : CompType} {n : 𝕊} {n' : 𝕊} {x : comp X} →
+      --   (set[ n ]⨾ set[ n' ]⨾ x) ≡ (set[ n' ]⨾ x)
+    set-set = λ {_} {n} {n'} {x} →
+        let open ≡-Reasoning in
+        begin
+          ƛ (λ _ → ap (ƛ (λ _ → ap x n')) n)
+        ≡⟨ Eq.cong ƛ (funext λ _ → ⇀-β) ⟩
+          ƛ (λ _ → ap x n')
+        ∎
     }
 ```
 
@@ -445,4 +612,4 @@ Prove this theorem (by induction on `effs`, the sequence of effects).
     ∎
     )
 ```
-     
+          
