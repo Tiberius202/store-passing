@@ -372,10 +372,15 @@ module Compile (cbpv : CBPV) (𝕊 : CBPV.ValType cbpv) where
     }
 ```
 
-### Isomorphism between the two forms (Target Goal):
-Currently work in progress. I have some weird error where it thinks these shuld be of type CBPV.
+### Isomorphism between the two forms (Future work):
+While the above shows that the CBPV is a valid implementation of CBPV-State, it is not obvious that the translation preserves the results.
 
-But I think that CBPV is a module not a type, so I am confused.
+This section is to do a representation independece proof between.
+
+The basic idea would be that given the same starting state, they result in the same final state.
+
+This should be easy as both languages support the same beta and eta rules.
+
 ```human
 record _↔_ (𝔸 𝔹 : Set) : Set where
   field
